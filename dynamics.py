@@ -10,7 +10,7 @@ import numpy as np
 
 class Dynamics:
 
-    def __init__(self, x0, stateDim=6, inputDim = 8):
+    def __init__(self, x0, stateDim=6, inputDim = 3):
         self.init = x0
         self.stateDim = stateDim
         self.inputDim = inputDim
@@ -29,12 +29,12 @@ class Dynamics:
 
 
 class Dyn(Dynamics):
-    
+
         # Thrusters Configuration
         #      (2) e_y (1)        ___
         #     <--   ^   -->      /   \
         #    ^  |   |   |  ^     v M  )
-        # (3)|--o-------o--|(0)    __/
+        # (3)|--o-------o--|(8)    __/
         #       | free- |
         #       | flyer |   ---> e_x
         #       | robot |
@@ -50,46 +50,89 @@ class Dyn(Dynamics):
 
     # with the position, return the velocity
     def derive(self, X, U, t):
-        
-    def set_wrench(self, wrench_body:Wrench2D):
-        u_Fx = wrench_body_clipped.fx / (2 * self.p.actuators["F_max_per_thruster"])
-        u_Fy = wrench_body_clipped.fy / (2 * self.p.actuators["F_max_per_thruster"])
+        """
+        Returns the derivative of the state vector
+        Args:
+            X => state variable, 6x1 numpy array at time t
+            U => input array: 2x1 numpy array, Force, Moment
+            t => time
+        Returns:
+            xDot: 6x1 x 1 derivative of the state vector
+        """
+        F = U[0:1,0]  # Force x and y
+        M = U[2,0]    # Moment about z
+        #unpack the state vector
+        x_dot, y_dot = X[4, 0], X[5, 0] #velocities
+        theta, theta_dot = X[2, 0], X[5, 0]             #orientations
 
+        x_ddot, y_ddot = F[0,0]/self._m, F[1,0]/self._m
+        theta_ddot = M/self._Ixx
+        deriv = np.array([[x_dot, y_dot, theta_dot, x_ddot, y_ddot, theta_ddot]])
 
-    def set_body_wrench(self, wrench_body):
-        # Clip the wrench
-        wrench_body_clipped = self.clip_wrench(wrench_body)
+        # Noise
+        # for i in range(len(deriv)):
+        #     deriv[i] = random.gauss(1, 0.05) * deriv[i]
+        return deriv
 
-        # Convert force
-        u_Fx = wrench_body_clipped.fx / (2 * self.p.actuators.F_max_per_thruster)
-        u_Fy = wrench_body_clipped.fy / (2 * self.p.actuators.F_max_per_thruster)
-        if u_Fx > 0:
-            u[2] = u_Fx
-            u[5] = u_Fx
-        else:
-            u[1] = -u_Fx
-            u[6] = -u_Fx
-        if u_Fy > 0:
-            u[4] = u_Fy
-            u[7] = u_Fy
-        else:
-            u[0] = -u_Fy
-            u[3] = -u_Fy
+def thrusters(index):
+        """
+        Returns the resultant force from the thruster specified
+        Input:
+            index: number thruster we want to get
+        Returns:
+            resultant (3x1) Force + moment ABOUT ROBOT AXIS from thruster    
+        """
+        # assert len(input) == 8, "input must be 8x1 mapping of thrusters"
+        # assert len(output) == , "output gives "
+        dim1 = 0.11461
+        dim2 = 0.0955
 
-        # Convert torque
-        u_M = wrench_body_clipped.tz / (
-            4 * self.p.actuators.F_max_per_thruster * self.p.actuators.thrusters_lever_arm
-        )
-        if u_M > 0:
-            for i in [1, 3, 5, 7]:
-                u[i] += u_M
-        else:
-            for i in [0, 2, 4, 6]:
-                u[i] += -u_M
+        # gives all the thrusters positions relative to its center
+        if index == 1: 
+            tPos = np.array([dim2, dim1])
+            F = np.array([0,-1])
+        elif index == 2: 
+            tPos = np.array([dim2, -dim1])
+            F = np.array([0,1])
+        elif index == 3:
+            tPos = np.array([-dim1, dim2])
+            F = np.array([0,-1])
+        elif index == 4: 
+            tPos = np.array([-dim1, -dim2])
+            F = np.array([0,1])
+        elif index == 5: 
+            tPos = np.array([-dim2, -dim1])
+            F = np.array([0,1])
+        elif index == 6: 
+            tPos = np.array([-dim2, dim1])
+            F = np.array([0,-1])
+        elif index == 7: 
+            tPos = np.array([dim1, -dim2])
+            F = np.array([0,1])
+        elif index == 8: 
+            tPos = np.array([dim1, dim2])
+            F = np.array([0,-1])
 
-        # Clip duty cycles to the range [0, 1]
-        for i in range(8):
-            u[i] = max(min(1.0, u[i]), 0.0)
-
-        self.set_thrust_duty_cycle(u)
-
+        Moment = np.cross(tPos, F)
+        Force = tPos[1]/(tPos[0]**2+tPos[1]**2)*np.array([-tPos[0], -tPos[1]])
+        return np.append(Force, Moment).reshape(-1,1)
+    
+def resultant_force(input):
+        """
+        Returns the resultant total force and moment that we would predict
+        Args:
+            thruster command, (8x1), each corresponding to a thruster index
+        Returns:
+            Force and moment of the FF in its own frame. 
+        """
+        force_x = 0
+        assert len(input) == 8, "check size of input, must have 8 binary values"
+        for i in range(len(input)):
+            # i gives the index in which I want to actuate -1. 
+            if input[i] == 1:
+                print("activated thruster", i+1)
+                force_x += thrusters(i+1)
+                # force_y += thrus
+        return force_x
+                
+       
