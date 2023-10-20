@@ -13,6 +13,15 @@ class BinaryThrusterController:
         self.goal = goal_state
         self.N = numSteps
 
+    def computeStateDist(self, state, goal):
+        posCost = np.linalg.norm(goal[:2] - state[:2])
+
+        dTheta = state[2] - goal[2]
+        angCost = np.min(2*np.pi - dTheta, dTheta)
+
+        return posCost + angCost
+
+
     def compute_input(self):
         curr_state = state_observer.get_state()
 

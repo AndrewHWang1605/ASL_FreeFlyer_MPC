@@ -28,7 +28,7 @@ class Environment:
         self.SIM_FREQ = 1000 #integration frequency in Hz
         self.CONTROL_FREQ = 50 #control frequency in Hz
         self.SIMS_PER_STEP = self.SIM_FREQ//self.CONTROL_FREQ
-        self.TOTAL_SIM_TIME = 10 #total simulation time in s
+        self.TOTAL_SIM_TIME = 20 #total simulation time in s
         
         #Define history arrays
         self.xHist = np.zeros((self.dynamics.stateDimn, self.TOTAL_SIM_TIME*self.CONTROL_FREQ))
@@ -109,7 +109,9 @@ class Environment:
             boolean: whether or not the time has exceeded the total simulation time
         """
         #check current time with respect to simulation time
-        if self.t >= self.TOTAL_SIM_TIME:
+        # if self.t >= self.TOTAL_SIM_TIME:
+        #     return True
+        if self.iter >= self.xHist.shape[1]:
             return True
         return False
     
