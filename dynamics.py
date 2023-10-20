@@ -83,86 +83,86 @@ class ThrusterDyn(Dynamics):
         return deriv
 
     def thrusters(self, index):
-            # Thrusters Configuration
-            #      (2) e_y (1)        ___
-            #     <--   ^   -->      /   \
-            #    ^  |   |   |  ^     v M  )
-            # (3)|--o-------o--|(8)    __/
-            #       | free- |
-            #       | flyer |   ---> e_x
-            #       | robot |
-            # (4)|--o-------o--|(7)
-            #    v  |       |  v
-            #     <--       -->
-            #      (5)     (6)
-            """
-            Returns the resultant force from the thruster specified
-            Input:
-                index: number thruster we want to get
-            Returns:
-                resultant (3x1) Force + moment ABOUT ROBOT AXIS from thruster    
-            """
-            assert index <= 8 and index >= 1, "input must be 8x1 mapping of thrusters"
-            # assert len(output) == , "output gives "
-            dim1 = 0.11461
-            dim2 = 0.0955
-            Fmax = 0.2
+        # Thrusters Configuration
+        #      (2) e_y (1)        ___
+        #     <--   ^   -->      /   \
+        #    ^  |   |   |  ^     v M  )
+        # (3)|--o-------o--|(8)    __/
+        #       | free- |
+        #       | flyer |   ---> e_x
+        #       | robot |
+        # (4)|--o-------o--|(7)
+        #    v  |       |  v
+        #     <--       -->
+        #      (5)     (6)
+        """
+        Returns the resultant force from the thruster specified
+        Input:
+            index: number thruster we want to get
+        Returns:
+            resultant (3x1) Force + moment ABOUT ROBOT AXIS from thruster    
+        """
+        assert index <= 8 and index >= 1, "input must be 8x1 mapping of thrusters"
+        # assert len(output) == , "output gives "
+        dim1 = 0.11461
+        dim2 = 0.0955
+        Fmax = 0.2
 
-            # gives all the thrusters positions relative to its center
-            if index == 1: 
-                tPos = np.array([dim2, dim1])
-                # F = np.array([0,-1])
-                F = np.array([-1,0])
-            elif index == 2: 
-                # tPos = np.array([dim2, -dim1])
-                # F = np.array([0,1])
-                tPos = np.array([-dim2, dim1])
-                F = np.array([1,0])
-            elif index == 3:
-                tPos = np.array([-dim1, dim2])
-                F = np.array([0,-1])
-            elif index == 4: 
-                tPos = np.array([-dim1, -dim2])
-                F = np.array([0,1])
-            elif index == 5: 
-                tPos = np.array([-dim2, -dim1])
-                # F = np.array([0,1])
-                F = np.array([1,0])
-            elif index == 6: 
-                # tPos = np.array([-dim2, dim1])
-                # F = np.array([0,-1])
-                tPos = np.array([dim2, -dim1])
-                F = np.array([-1,0])
-            elif index == 7: 
-                # tPos = np.array([dim1, -dim2])
-                tPos = np.array([dim1, -dim2])
-                F = np.array([0,1])
-            elif index == 8: 
-                tPos = np.array([dim1, dim2])
-                F = np.array([0,-1])
+        # gives all the thrusters positions relative to its center
+        if index == 1: 
+            tPos = np.array([dim2, dim1])
+            # F = np.array([0,-1])
+            F = np.array([-1,0])
+        elif index == 2: 
+            # tPos = np.array([dim2, -dim1])
+            # F = np.array([0,1])
+            tPos = np.array([-dim2, dim1])
+            F = np.array([1,0])
+        elif index == 3:
+            tPos = np.array([-dim1, dim2])
+            F = np.array([0,-1])
+        elif index == 4: 
+            tPos = np.array([-dim1, -dim2])
+            F = np.array([0,1])
+        elif index == 5: 
+            tPos = np.array([-dim2, -dim1])
+            # F = np.array([0,1])
+            F = np.array([1,0])
+        elif index == 6: 
+            # tPos = np.array([-dim2, dim1])
+            # F = np.array([0,-1])
+            tPos = np.array([dim2, -dim1])
+            F = np.array([-1,0])
+        elif index == 7: 
+            # tPos = np.array([dim1, -dim2])
+            tPos = np.array([dim1, -dim2])
+            F = np.array([0,1])
+        elif index == 8: 
+            tPos = np.array([dim1, dim2])
+            F = np.array([0,-1])
 
-            Moment = np.cross(tPos, F*Fmax)
-            # Force = tPos[1]/(tPos[0]**2+tPos[1]**2)*np.array([-tPos[0], -tPos[1]]) * Fmax
-            Force = F*Fmax # Not too sure about this one
-            return np.append(Force, Moment).reshape(-1,1)
+        Moment = np.cross(tPos, F*Fmax)
+        # Force = tPos[1]/(tPos[0]**2+tPos[1]**2)*np.array([-tPos[0], -tPos[1]]) * Fmax
+        Force = F*Fmax # Not too sure about this one
+        return np.append(Force, Moment).reshape(-1,1)
         
     def resultant_force_and_moment(self, input):
-            """
-            Returns the resultant total force and moment that we would predict
-            Args:
-                thruster command, (8x1), each corresponding to a thruster index
-            Returns:
-                Force and moment of the FF in its own frame. 
-            """
-            force_x = 0
-            squeezed_input = input.squeeze()
-            assert len(input) == 8, "check size of input, must have 8 binary values"
-            for i in range(len(squeezed_input)):
-                # i gives the index in which I want to actuate -1. 
-                if squeezed_input[i] == 1:
-                    # print("activated thruster", i+1)
-                    force_x += self.thrusters(i+1)
-            return force_x
+        """
+        Returns the resultant total force and moment that we would predict
+        Args:
+            thruster command, (8x1), each corresponding to a thruster index
+        Returns:
+            Force and moment of the FF in its own frame. 
+        """
+        force_x = 0
+        squeezed_input = input.squeeze()
+        assert len(input) == 8, "check size of input, must have 8 binary values"
+        for i in range(len(squeezed_input)):
+            # i gives the index in which I want to actuate -1. 
+            if squeezed_input[i] == 1:
+                # print("activated thruster", i+1)
+                force_x += self.thrusters(i+1)
+        return force_x
                     
     def get_rotmatrix_body_to_world(self, theta):
         R = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
