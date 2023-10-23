@@ -111,11 +111,8 @@ class ThrusterDyn(Dynamics):
         # gives all the thrusters positions relative to its center
         if index == 1: 
             tPos = np.array([dim2, dim1])
-            # F = np.array([0,-1])
             F = np.array([-1,0])
         elif index == 2: 
-            # tPos = np.array([dim2, -dim1])
-            # F = np.array([0,1])
             tPos = np.array([-dim2, dim1])
             F = np.array([1,0])
         elif index == 3:
@@ -126,15 +123,11 @@ class ThrusterDyn(Dynamics):
             F = np.array([0,1])
         elif index == 5: 
             tPos = np.array([-dim2, -dim1])
-            # F = np.array([0,1])
             F = np.array([1,0])
         elif index == 6: 
-            # tPos = np.array([-dim2, dim1])
-            # F = np.array([0,-1])
             tPos = np.array([dim2, -dim1])
             F = np.array([-1,0])
         elif index == 7: 
-            # tPos = np.array([dim1, -dim2])
             tPos = np.array([dim1, -dim2])
             F = np.array([0,1])
         elif index == 8: 

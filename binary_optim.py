@@ -2,6 +2,9 @@
 Script to perform MPC optimization for binary thruster commands for Free Flyer
 Andrew Wang (aw1605@stanford.edu)
 10/10/2023
+Added on some stuff
+Joshua Lee 10/23/23
+
 """
 
 import numpy as np 
@@ -23,7 +26,8 @@ class BinaryThrusterController:
 
 
     def compute_input(self):
-        curr_state = state_observer.get_state()
+        # curr_state = state_observer.get_state()
+        curr_state = self.state_observer.get_state()
 
         # Evaluate optimal inputs
         opti = ca.Opti()

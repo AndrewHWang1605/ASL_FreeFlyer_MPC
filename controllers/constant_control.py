@@ -17,5 +17,3 @@ class ConstantController:
 
     def get_input(self):
         return self._u
-
-
