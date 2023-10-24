@@ -23,7 +23,7 @@ class StateObserver():
         """
         Returns a potentially noisy observation of the system state
         """
-        print("state",self.dynamics.get_state())
+        # print("state",self.dynamics.get_state())
         return self.dynamics.get_state() + np.random.normal(self.mean, self.sd, (self.stateDimn, 1))
     
 

@@ -24,7 +24,6 @@ class BinaryThrusterController:
 
         return posCost + angCost
 
-
     def compute_input(self):
         # curr_state = state_observer.get_state()
         curr_state = self.state_observer.get_state()
