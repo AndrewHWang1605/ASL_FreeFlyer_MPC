@@ -5,7 +5,7 @@ sys.path.append('./controllers')
 from environment import *
 from dynamics import *
 from constant_control import ConstantController
-# from mpc_ctrl import MPC_Controller
+from mpc_ctrl import MPC_Controller
 # from trajectory import *
 from state_observer import *
 
@@ -22,8 +22,8 @@ sd = 0.01
 observer = StateObserver(dynamics, mean, sd)
 
 #create a planar quadrotor controller
-controller = ConstantController(observer)
-# controller = MPC_Controller(observer, dynamics) # if mpc
+# controller = ConstantController(observer)
+controller = MPC_Controller(observer, dynamics) # if mpc
 
 #create a simulation environment
 env = Environment(dynamics, controller, observer)

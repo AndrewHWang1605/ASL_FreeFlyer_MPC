@@ -66,8 +66,7 @@ class Environment:
         
         #Zero order hold over the controller frequency
         for i in range(self.SIMS_PER_STEP):
-            self.dynamics.integrate(self.controller.get_input(), self.t, 1/self.SIM_FREQ) #integrate dynamics
-            # self.dynamics.integrate(self.controller.get_input()[0], self.t, 1/self.SIM_FREQ) # if mpc? 
+            self.dynamics.integrate(self.controller.get_input(), self.t, 1/self.SIM_FREQ) #integrate dynamics 
             self.t += 1/self.SIM_FREQ #increment the time
             
         #update the deterministic system data, iterations, and history array
