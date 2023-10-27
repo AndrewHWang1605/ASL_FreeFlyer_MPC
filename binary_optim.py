@@ -58,4 +58,3 @@ class BinaryThrusterController:
             uOpt = np.zeros((8, self.N)) #return a zero vector
 
         return uOpt[:,0]
-        

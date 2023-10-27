@@ -147,9 +147,10 @@ class ThrusterDyn(Dynamics):
         Returns:
             Force and moment of the FF in its own frame. 
         """
-        force_x = 0
+        force_x = np.zeros((3,1))
         squeezed_input = input.squeeze()
         assert len(input) == 8, "check size of input, must have 8 binary values"
+
         for i in range(len(squeezed_input)):
             # i gives the index in which I want to actuate -1. 
             if squeezed_input[i] == 1:
@@ -171,7 +172,7 @@ class ThrusterDyn(Dynamics):
             animate (bool, optional): Whether to generate animation or not. Defaults to True.
         """
         #Set constant animtion parameters
-        GOAL_POS = [1, 2]
+        GOAL_POS = [1, 1]
         FREQ = 50 #control frequency, same as data update frequency
         L = 0.15 #Forward arrow length
         
@@ -191,7 +192,7 @@ class ThrusterDyn(Dynamics):
             line, = ax.plot([], [], '-r', lw=2)
             
             #plot the goal position
-            # ax.scatter([GOAL_POS[0]], [GOAL_POS[1]], color = 'y')
+            ax.scatter([GOAL_POS[0]], [GOAL_POS[1]], color = 'y')
                 
             def animate(i):
                 x = xData[0, i]
