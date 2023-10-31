@@ -135,7 +135,6 @@ class ThrusterDyn(Dynamics):
         force_x, force_y, moment = 0 , 0 , 0
         squeezed_input = input.squeeze()
         assert len(input) == 8, "check size of input, must have 8 binary values"
-        print("input\n", squeezed_input)
         for idx in range(len(squeezed_input)):
             if squeezed_input[idx] == 1:
                 tPos = self.thruster_pos[idx-1]
