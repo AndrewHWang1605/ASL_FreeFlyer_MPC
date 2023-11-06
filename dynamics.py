@@ -11,7 +11,7 @@ from matplotlib import animation, patches
 # VARIABLES
 dim1 = 0.11461
 dim2 = 0.0955
-
+radius = np.sqrt(dim1**2+dim2**2)
 Fmax = 0.2
 
 # Return x(t+1) given x(t), u(t)
@@ -84,7 +84,7 @@ class ThrusterDyn(Dynamics):
         F = self.get_rotmatrix_body_to_world(theta) @ [F_x, F_y]
         M = res[2]    # Moment about z
         # missing coriolis term? Maybe co
-        x_ddot, y_ddot = self.get_rotmatrix_body_to_world(theta) @ [F_x/self._m-y_dot*theta_dot, F_y/self._m+x_dot*theta_dot]
+        x_ddot, y_ddot = self.get_rotmatrix_body_to_world(theta) @ [F_x/self._m, F_y/self._m]
         theta_ddot = M/self._Ixx
         deriv = np.array([[x_dot, y_dot, theta_dot, x_ddot, y_ddot, theta_ddot]]).T
 
@@ -133,22 +133,23 @@ class ThrusterDyn(Dynamics):
             Force and moment of the FF in its own frame. 
         """
         force_x, force_y, moment = 0 , 0 , 0
-        squeezed_input = input.squeeze()
+        sq_input = input.squeeze()
         assert len(input) == 8, "check size of input, must have 8 binary values"
-        for idx in range(len(squeezed_input)):
-            if squeezed_input[idx] == 1:
+        for idx in range(len(sq_input)):
+            if sq_input[idx] == 1:
                 tPos = self.thruster_pos[idx-1]
                 thruster_dir = np.rad2deg(np.arctan2(tPos[1], tPos[0]))
-                force_x += Fmax * np.cos(thruster_dir)
-                force_y += Fmax *np.cos(thruster_dir)
-                moment += self.thruster_pos[idx-1][0]*Fmax*np.sin(thruster_dir) - self.thruster_pos[idx-1][1]*Fmax*np.cos(thruster_dir)
+
+                force_x += Fmax * np.cos(thruster_dir)**2
+                force_y += Fmax *np.sin(thruster_dir)*np.cos(thruster_dir)
+                # moment += tPos[0]*Fmax*np.sin(thruster_dir)-tPos[1]*Fmax*np.cos(thruster_dir)
+                moment += radius*Fmax*np.sin(thruster_dir)
+        # print(force_x, force_y, "\nforces old")
+        force_x = sq_input[1]+sq_input[4]-(sq_input[0] + sq_input[5])
+        force_y = sq_input[3]+sq_input[6]-(sq_input[2]+sq_input[7])
+        # print(force_x, force_y, "forces new")
         return force_x, force_y, moment
-        # for i in range(len(squeezed_input)):
-        #     # i gives the index in which I want to actuate -1. 
-        #     if squeezed_input[i] == 1:
-        #         # print("activated thruster", i+1)
-        #         force_x += self.thrusters(i+1)
-        # return force_x
+
                     
     def get_rotmatrix_body_to_world(self, theta):
         R = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])

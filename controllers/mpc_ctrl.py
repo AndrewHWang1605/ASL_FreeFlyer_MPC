@@ -16,7 +16,8 @@ class MPC_Controller:
     def __init__(self, state_observer, dynamics):
         self.observer = state_observer
         self._u = None
-        self.goal_state = np.array([3,3,0.5,0.5,0,0]).reshape(-1,1)
+        self.goal_state = np.array([1,1,0.5,0.5,0,0]).reshape(-1,1)
+        self.prev_command = None
         # self.command_history = np.zeros([20,8])
         self.command_seq = None
         # self.dynamics = dynamics
@@ -34,7 +35,7 @@ class MPC_Controller:
     def eval_input(self):
         min_cost = self.state_cost(self.observer.get_state())
         # min_cost = float('inf')
-        for i in range(100):
+        for i in range(10):
             seq = np.zeros((DEPTH,8))
             # generates each of DEPTH number of commands for each sequence
             for j in range(DEPTH):
@@ -48,8 +49,9 @@ class MPC_Controller:
                 min_cost = cost
                 self.command_seq = seq
         if self.command_seq is not None:
+            self.prev_command = self.command_seq[0]
             return self.command_seq[0]
-        return np.zeros((DEPTH, 8))
+        return self.prev_command
 
     def get_input(self):
         if self.command_seq is not None:
@@ -67,7 +69,7 @@ class MPC_Controller:
                 predicted_state = simulated.get_state()
                 cost_state += self.state_cost(predicted_state)
                 time += 0.001
-        return (cost_state + gas_cost/1000 + switch_cost/1000)/DEPTH
+        return (cost_state)/DEPTH
 
     def state_cost(self, state):
         dist = self.compute_dstate(state, self.goal_state)

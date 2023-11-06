@@ -12,7 +12,7 @@ class ConstantController:
         self._u = None
 
     def eval_input(self):
-        self._u = np.array([[1,0,1,0,0,0,0,1]]).T
+        self._u = np.array([[1,0,1,0,1,0,0,0]]).T
         return self._u
 
     def get_input(self):
