@@ -10,7 +10,9 @@ import math
 
 from dynamics import Dynamics, ThrusterDyn
 
-DEPTH = 10
+DEPTH = 5
+NUM_SAMPLES = 10
+DISCOUNT = 0.75
 
 class MPC_Controller:
     def __init__(self, state_observer, dynamics):
@@ -18,6 +20,7 @@ class MPC_Controller:
         self._u = None
         self.goal_state = np.array([1,1,0.5,0.5,0,0]).reshape(-1,1)
         self.prev_command = None
+        self.total_sequences = np.zeros((DEPTH,8))
         # self.command_history = np.zeros([20,8])
         self.command_seq = None
         # self.dynamics = dynamics
@@ -32,32 +35,10 @@ class MPC_Controller:
 
         return [delta_pos, delta_angle, delta_vel, delta_angv]
 
-    def eval_input(self):
-        min_cost = self.state_cost(self.observer.get_state())
-        # min_cost = float('inf')
-        for i in range(10):
-            seq = np.zeros((DEPTH,8))
-            # generates each of DEPTH number of commands for each sequence
-            for j in range(DEPTH):
-                sample = random.randint(0,80) 
-                seq[j] = sample_2binary(sample)
-
-            # TODO: how to compute cost ? 
-            # print("sequence attmpted", seq)
-            cost = self.cost_function(seq, ThrusterDyn(self.observer.get_state()))
-            if cost < min_cost:
-                min_cost = cost
-                self.command_seq = seq
-        if self.command_seq is not None:
-            self.prev_command = self.command_seq[0]
-            return self.command_seq[0]
-        return self.prev_command
-
     def get_input(self):
         if self.command_seq is not None:
-            return self.command_seq[0]
+            return self.command_seq
         return np.zeros((8))
-        # return self.command_seq[0]
     
     def cost_function(self, sequence, simulated):
         gas_cost = np.sum(sum(sequence))
@@ -77,14 +58,111 @@ class MPC_Controller:
         ang_cost = (abs(dist[1])**2 + abs(dist[3]))
         # print(pv_cost,ang_cost)
         return pv_cost + ang_cost/20
+    
+    def generate_samples(self, D):
+        # take 10 samples from the start generate a sample from the start
 
-    # def eval_input(self):
+        seq = np.zeros((D,8)) # for a depth long sequence of commands
+        for j in range(D):
+            sample = random.randint(0,80) 
+            seq[j] = sample_2binary(sample)
+        return seq
 
-    #     self._u = np.array([[1,0,0,0,0,0,0,0]]).T
-    #     return self._u
+    def recursive_costs(self, sequence, sim, depth, cost_prevstate):
+        # we need to figure out what the cost at this current state is. That way we can try to make sure we converge to lower costs
+        curr_cost = self.state_cost(self.observer.get_state())
+        optimal_cost = float('inf')
+        
+        # base case
+        if depth == DEPTH:
+            sim.integrate(sequence, 0, 1/1000)
+            predicted_state = sim.get_state()
+            return self.state_cost(predicted_state), [sequence] #* DISCOUNT**depth
+        
+        sim.integrate(sequence, 0, 1/1000)
+        predicted_state = sim.get_state()
+        
+        optimal_cost = float('inf')
+        optimal_sequence = None
 
-    # def get_input(self):
-    #     return self._u
+        sequences = off_by_one(sequence)
+        for seq in sequences:
+            result = self.recursive_costs(seq, ThrusterDyn(predicted_state), depth+1, None)
+
+            if result is not None:
+                cost, sequence_taken = result
+                if cost < optimal_cost:
+                    optimal_cost = cost
+                    optimal_sequence = sequence_taken
+        if optimal_sequence is not None:
+            return optimal_cost, [sequence] + optimal_sequence
+        else:
+            return None
+
+        # if predicted_cost > curr_cost: # means we are not getting closer to the target with that specific command
+        #     # we need to make sure the returned sequence is like nothing and cost is infinity
+        #     sequence = None
+        # elif predicted_cost < optimal_cost:
+        #     optimal_cost = predicted_cost
+        #     self.total_sequences[DEPTH-depth] = sequence
+            
+        
+        # cost_state = self.state_cost(predicted_state) * DISCOUNT**(DEPTH-depth)
+        # total_cost = cost_state
+        # sequences = off_by_one(sequence)
+        
+        # if sequences is not None:
+        #     for i in range(8):
+        #         result = self.recursive_costs(sequences[i], ThrusterDyn(predicted_state), depth-1, cost_state)
+        #         print(result)
+        #         if result is not None:
+        #             total_cost += result[1]
+        #     return sequence, total_cost
+        # else:
+        #     return None
+        
+
+    def eval_input(self):
+        # go thru the information and return the best thruster action to take. 
+
+        min_cost = float('inf')
+        # we don't know what the cost is.
+
+        number = random.randint(0,80)
+        init_sample = sample_2binary(number)
+        # by this step, we have a sample that we can find the best action resulting from it
+
+
+        sample_result = self.recursive_costs(init_sample, ThrusterDyn(self.observer.get_state()), 0, None)
+        
+        if sample_result is not None:
+            sample_cost, sample_sequence = sample_result
+            if sample_cost < min_cost:
+                min_cost = sample_cost
+                self.command_seq = init_sample
+
+        if self.command_seq is not None:
+            self.prev_command = self.command_seq
+            return self.command_seq
+        return self.prev_command
+    
+    
+
+
+def off_by_one(seq):
+    '''
+    Takes in a sequence and returns the 8 thruster commands that only differ by one
+    thruster command.
+    '''
+    if seq is None:
+        return None
+    sequences = []
+    # change the first one and assign to first in sequence
+    for i in range(len(seq)):
+        seq_ = seq.copy()
+        seq_[i] = (seq_[i]+1)%2
+        sequences.append(seq_)
+    return np.array(sequences)
 
 def sample_2binary(num):
     '''

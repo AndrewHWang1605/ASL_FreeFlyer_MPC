@@ -75,7 +75,6 @@ class ThrusterDyn(Dynamics):
         #unpack the state vector
         x, y, x_dot, y_dot = X[0,0], X[1,0], X[3, 0], X[4, 0] #velocities
         theta, theta_dot = X[2, 0], X[5, 0]             #orientations
-
         res = self.resultant_force_and_moment(U)
         F_x, F_y = res[0], res[1]  # Force x and y
 
