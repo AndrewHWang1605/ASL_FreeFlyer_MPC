@@ -98,28 +98,6 @@ class MPC_Controller:
             return optimal_cost, [sequence] + optimal_sequence
         else:
             return None
-
-        # if predicted_cost > curr_cost: # means we are not getting closer to the target with that specific command
-        #     # we need to make sure the returned sequence is like nothing and cost is infinity
-        #     sequence = None
-        # elif predicted_cost < optimal_cost:
-        #     optimal_cost = predicted_cost
-        #     self.total_sequences[DEPTH-depth] = sequence
-            
-        
-        # cost_state = self.state_cost(predicted_state) * DISCOUNT**(DEPTH-depth)
-        # total_cost = cost_state
-        # sequences = off_by_one(sequence)
-        
-        # if sequences is not None:
-        #     for i in range(8):
-        #         result = self.recursive_costs(sequences[i], ThrusterDyn(predicted_state), depth-1, cost_state)
-        #         print(result)
-        #         if result is not None:
-        #             total_cost += result[1]
-        #     return sequence, total_cost
-        # else:
-        #     return None
         
 
     def eval_input(self):
@@ -127,7 +105,7 @@ class MPC_Controller:
 
         min_cost = float('inf')
         # we don't know what the cost is.
-
+        
         number = random.randint(0,80)
         init_sample = sample_2binary(number)
         # by this step, we have a sample that we can find the best action resulting from it
