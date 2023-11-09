@@ -23,7 +23,8 @@ class Dynamics:
         self._x = x0
         self.stateDimn = stateDim
         self.inputDimn = inputDim
-        self.thruster_orien = np.array(([-1,0],[1,0],[0,-1],[0,1],[1,0],[-1,0],[0,1],[0,-1]))
+        self.thruster_orien = np.array(([-1,0],[1,0],[0,-1],[0,1],
+                                        [1,0],[-1,0],[0,1],[0,-1]))
         self.thruster_pos = np.array(([dim2, dim1],[-dim2, dim1],[-dim1, dim2],[-dim1, -dim2],
                                      [-dim2, -dim1],[dim2, -dim1],[dim1, -dim2],[dim1, dim2]))
 
@@ -136,22 +137,17 @@ class ThrusterDyn(Dynamics):
         assert len(input) == 8, "check size of input, must have 8 binary values"
         for idx in range(len(sq_input)):
             if sq_input[idx] == 1:
-                tPos = self.thruster_pos[idx-1]
+                tPos = self.thruster_pos[idx]
                 thruster_dir = np.rad2deg(np.arctan2(tPos[1], tPos[0]))
-
-                force_x += Fmax * np.cos(thruster_dir)
-                force_y += Fmax *np.sin(thruster_dir)
+                
+                force_x += Fmax * self.thruster_orien[idx,0]
+                force_y += Fmax * self.thruster_orien[idx,1]
                 moment += tPos[0]*Fmax*np.sin(thruster_dir)-tPos[1]*Fmax*np.cos(thruster_dir)
-        # force_x = sq_input[1]+sq_input[4]-(sq_input[0] + sq_input[5])
-        # force_y = sq_input[3]+sq_input[6] - (sq_input[2]+sq_input[7])
-        # print()
+                # moment += np.linalg.norm(tPos) * Fmax*np.sin(thruster_dir)
+
+        # print("force x: ", force_x, "\nforce y: ", force_y, "\nmoment:", moment)
         return force_x, force_y, moment
-        # for i in range(len(squeezed_input)):
-        #     # i gives the index in which I want to actuate -1. 
-        #     if squeezed_input[i] == 1:
-        #         # print("activated thruster", i+1)
-        #         force_x += self.thrusters(i+1)
-        # return force_x
+        
                     
     def get_rotmatrix_body_to_world(self, theta):
         R = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
