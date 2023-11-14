@@ -18,6 +18,7 @@ class StateObserver():
         self.stateDimn = dynamics.stateDimn
         self.mean = mean
         self.sd = sd
+        np.random.seed(0)
         
     def get_state(self):
         """

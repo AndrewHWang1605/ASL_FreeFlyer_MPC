@@ -8,15 +8,24 @@ import matplotlib.pyplot as plt
 from matplotlib import animation, patches
 
 
+# VARIABLES
+dim1 = 0.11461
+dim2 = 0.0955
+
+Fmax = 0.2
+
 # Return x(t+1) given x(t), u(t)
 
 class Dynamics:
-
+    
     def __init__(self, x0, stateDim=6, inputDim=8):
         self.init = x0
         self._x = x0
         self.stateDimn = stateDim
         self.inputDimn = inputDim
+        self.thruster_orien = np.array(([-1,0],[1,0],[0,-1],[0,1],[1,0],[-1,0],[0,1],[0,-1]))
+        self.thruster_pos = np.array(([dim2, dim1],[-dim2, dim1],[-dim1, dim2],[-dim1, -dim2],
+                                     [-dim2, -dim1],[dim2, -dim1],[dim1, -dim2],[dim1, dim2]))
 
         self._u = None
 
@@ -64,16 +73,18 @@ class ThrusterDyn(Dynamics):
             xDot: 6x1 x 1 derivative of the state vector
         """
         #unpack the state vector
-        x_dot, y_dot = X[3, 0], X[4, 0] #velocities
+        x, y, x_dot, y_dot = X[0,0], X[1,0], X[3, 0], X[4, 0] #velocities
         theta, theta_dot = X[2, 0], X[5, 0]             #orientations
 
         res = self.resultant_force_and_moment(U)
-        Fbody = res[0:2]  # Force x and y
-        F = self.get_rotmatrix_body_to_world(theta) @ Fbody
+        F_x, F_y = res[0], res[1]  # Force x and y
 
-        M = res[2].squeeze()    # Moment about z
+        xdot_world, ydot_world = self.get_rotmatrix_body_to_world(theta) @ [x_dot, y_dot]
 
-        x_ddot, y_ddot = F[0,0]/self._m, F[1,0]/self._m
+        F = self.get_rotmatrix_body_to_world(theta) @ [F_x, F_y]
+        M = res[2]    # Moment about z
+        # missing coriolis term? Maybe co
+        x_ddot, y_ddot = self.get_rotmatrix_body_to_world(theta) @ [F_x/self._m-y_dot*theta_dot, F_y/self._m+x_dot*theta_dot]
         theta_ddot = M/self._Ixx
         deriv = np.array([[x_dot, y_dot, theta_dot, x_ddot, y_ddot, theta_ddot]]).T
 
@@ -100,47 +111,14 @@ class ThrusterDyn(Dynamics):
         Input:
             index: number thruster we want to get
         Returns:
-            resultant (3x1) Force + moment ABOUT ROBOT AXIS from thruster    
+            resultant (3x1) Force + moment ABOUT ROBOT AXIS from thruster
         """
         assert index <= 8 and index >= 1, "input must be 8x1 mapping of thrusters"
-        # assert len(output) == , "output gives "
-        dim1 = 0.11461
-        dim2 = 0.0955
-        Fmax = 0.2
+        F = self.thruster_orien[index-1]
+        tPos = self.thruster_pos[index-1]
 
-        # gives all the thrusters positions relative to its center
-        if index == 1: 
-            tPos = np.array([dim2, dim1])
-            # F = np.array([0,-1])
-            F = np.array([-1,0])
-        elif index == 2: 
-            # tPos = np.array([dim2, -dim1])
-            # F = np.array([0,1])
-            tPos = np.array([-dim2, dim1])
-            F = np.array([1,0])
-        elif index == 3:
-            tPos = np.array([-dim1, dim2])
-            F = np.array([0,-1])
-        elif index == 4: 
-            tPos = np.array([-dim1, -dim2])
-            F = np.array([0,1])
-        elif index == 5: 
-            tPos = np.array([-dim2, -dim1])
-            # F = np.array([0,1])
-            F = np.array([1,0])
-        elif index == 6: 
-            # tPos = np.array([-dim2, dim1])
-            # F = np.array([0,-1])
-            tPos = np.array([dim2, -dim1])
-            F = np.array([-1,0])
-        elif index == 7: 
-            # tPos = np.array([dim1, -dim2])
-            tPos = np.array([dim1, -dim2])
-            F = np.array([0,1])
-        elif index == 8: 
-            tPos = np.array([dim1, dim2])
-            F = np.array([0,-1])
-
+        deg = np.arctan2(tPos[1], tPos[0])
+        
         Moment = np.cross(tPos, F*Fmax)
         # Force = tPos[1]/(tPos[0]**2+tPos[1]**2)*np.array([-tPos[0], -tPos[1]]) * Fmax
         Force = F*Fmax # Not too sure about this one
@@ -150,25 +128,46 @@ class ThrusterDyn(Dynamics):
         """
         Returns the resultant total force and moment that we would predict
         Args:
-            thruster command, (8x1), each corresponding to a thruster index
+            thruster command, (8x1), each corresponding to a thruster index, binary 0 to 1
         Returns:
             Force and moment of the FF in its own frame. 
         """
-        force_x = 0
+        force_x, force_y, moment = 0 , 0 , 0
         squeezed_input = input.squeeze()
         assert len(input) == 8, "check size of input, must have 8 binary values"
-        for i in range(len(squeezed_input)):
-            # i gives the index in which I want to actuate -1. 
-            if squeezed_input[i] == 1:
-                # print("activated thruster", i+1)
-                force_x += self.thrusters(i+1)
-        return force_x
+        # for idx in range(len(squeezed_input)):
+        #     if squeezed_input[idx] == 1:
+        #         tPos = self.thruster_pos[idx-1]
+        #         thruster_dir = np.rad2deg(np.arctan2(tPos[1], tPos[0]))
+        #         force_x += Fmax * np.cos(thruster_dir)
+        #         force_y += Fmax *np.cos(thruster_dir)
+        #         moment += self.thruster_pos[idx-1][0]*Fmax*np.sin(thruster_dir) - self.thruster_pos[idx-1][1]*Fmax*np.cos(thruster_dir)
+        # return force_x, force_y, moment
+        for idx in range(len(squeezed_input)):
+            # if squeezed_input[idx] == 1:
+            tOri = self.thruster_orien[idx]
+            tPos = self.thruster_pos[idx]
+            # thruster_dir = np.rad2deg(np.arctan2(tPos[1], tPos[0]))
+            # thruster_dir = np.arctan2(tOri[1], tOri[0])
+            force_x += Fmax * squeezed_input[idx] * tOri[0]
+            force_y += Fmax * squeezed_input[idx] * tOri[1]
+            moment += np.cross(tPos, Fmax*squeezed_input[idx]*np.array(tOri))
+                # moment += self.thruster_pos[idx-1][0]*Fmax*tOri[1] - self.thruster_pos[idx-1][1]*Fmax*tOri[0]
+        # print(force_x, force_y, moment)
+        return force_x, force_y, moment
+        # for i in range(len(squeezed_input)):
+        #     # i gives the index in which I want to actuate -1. 
+        #     if squeezed_input[i] == 1:
+        #         # print("activated thruster", i+1)
+        #         force_x += self.thrusters(i+1)
+        # return force_x
                     
     def get_rotmatrix_body_to_world(self, theta):
         R = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
         return R
 
-    def show_animation(self, xData, uData, tData, animate = True):
+
+    def show_animation(self, xData, uData, tData, animate = True, freq = 10):
         """
         Shows the animation and visualization of data for this system.
         Args:
@@ -179,7 +178,7 @@ class ThrusterDyn(Dynamics):
         """
         #Set constant animtion parameters
         GOAL_POS = [1, 2]
-        FREQ = 50 #control frequency, same as data update frequency
+        FREQ = freq #control frequency, same as data update frequency
         L = 0.15 #Forward arrow length
         
         if animate:
@@ -196,6 +195,8 @@ class ThrusterDyn(Dynamics):
 
             #define the line for the quadrotor
             line, = ax.plot([], [], '-r', lw=2)
+            # time = ax.anno/tate(0, xy=(1, 8), xytext=(1, 8))
+            time_text = ax.text(0.05, 0.95,'',horizontalalignment='left',verticalalignment='top', transform=ax.transAxes)
             
             #plot the goal position
             # ax.scatter([GOAL_POS[0]], [GOAL_POS[1]], color = 'y')
@@ -214,10 +215,13 @@ class ThrusterDyn(Dynamics):
                 thisx = [x1, x2]
                 thisy = [y1, y2]
                 line.set_data(thisx, thisy)
+
+                time_text.set_text('time = %.1f' % (i/FREQ))
+                # time.set_text(i)
                 
-                return line, circle
+                return line, circle, time_text
             
-            anim = animation.FuncAnimation(fig, animate, frames=num_frames, interval=1/FREQ*1000, blit=True)
+            anim = animation.FuncAnimation(fig, animate, frames=num_frames, interval=1/FREQ*500, blit=True)
             plt.xlabel("X Position (m)")
             plt.ylabel("Y Position (m)")
             plt.title("Position of Free Flyer")
@@ -244,8 +248,9 @@ class ThrusterDyn(Dynamics):
         xlabel = 'Time (s)'
         ylabels = [1,2,3,4,5,6,7,8]
         for i in range(len(ylabels)):
-            axs[i].plot(tData.reshape((tData.shape[1], )).tolist(), uData[i, :].tolist())
+            axs[i].step(tData.reshape((tData.shape[1], )).tolist(), uData[i, :].tolist())
             axs[i].set(ylabel=ylabels[i])
             axs[i].grid()
+            axs[i].set_ylim([-0.1,1.1])
         axs[1].set(xlabel = xlabel)
         plt.show()

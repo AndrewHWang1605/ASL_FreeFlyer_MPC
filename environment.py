@@ -1,7 +1,10 @@
 import numpy as np
+import time
+
+times = []
 
 class Environment:
-    def __init__(self, dynamics, controller, observer):
+    def __init__(self, dynamics, controller, observer, goal, time=10, freq=10):
         """
         Initializes a simulation environment
         Args:
@@ -26,14 +29,16 @@ class Environment:
         
         #Define simulation parameters
         self.SIM_FREQ = 1000 #integration frequency in Hz
-        self.CONTROL_FREQ = 50 #control frequency in Hz
+        self.CONTROL_FREQ = freq #control frequency in Hz
         self.SIMS_PER_STEP = self.SIM_FREQ//self.CONTROL_FREQ
-        self.TOTAL_SIM_TIME = 20 #total simulation time in s
+        self.TOTAL_SIM_TIME = time #total simulation time in s
         
         #Define history arrays
         self.xHist = np.zeros((self.dynamics.stateDimn, self.TOTAL_SIM_TIME*self.CONTROL_FREQ))
         self.uHist = np.zeros((self.dynamics.inputDimn, self.TOTAL_SIM_TIME*self.CONTROL_FREQ))
         self.tHist = np.zeros((1, self.TOTAL_SIM_TIME*self.CONTROL_FREQ))
+
+        self.goal = goal
         
     def reset(self):
         """
@@ -57,12 +62,15 @@ class Environment:
         """
         Step the sim environment by one integration
         """
+        prev_time = time.perf_counter()
         #retrieve current state information
         self._get_observation() #updates the observer
         
         #solve for the control input using the observed state
         # self.controller.eval_input(self.t)
         self.controller.eval_input()
+
+        times.append(time.perf_counter() - prev_time)
         
         #Zero order hold over the controller frequency
         for i in range(self.SIMS_PER_STEP):
@@ -133,4 +141,14 @@ class Environment:
         """
         Provide visualization of the environment
         """
-        self.dynamics.show_animation(self.xHist, self.uHist, self.tHist)
+        print("Total Input Effort:", np.sum(np.trapz(self.uHist, self.tHist)))
+        print("Final Tracking Error:", self.xHist[:,-1] - self.goal.T)
+        try:
+            poserr_ind = np.argwhere(np.linalg.norm(self.xHist[:2,:] - self.goal[:2], axis=0) > 0.05).squeeze()
+            therr_ind = np.argwhere(np.abs(self.xHist[2,:] - self.goal[2,0]) > 0.1)
+            max_ind = np.max([poserr_ind[-1], therr_ind[-1]])
+            print("Time settle to <0.05m positional and 0.1rad angular error", self.tHist[0, max_ind]) 
+        except:
+            print("Never converged")
+        print("Average timestep time:", np.mean(times))
+        self.dynamics.show_animation(self.xHist, self.uHist, self.tHist, freq=self.CONTROL_FREQ)
