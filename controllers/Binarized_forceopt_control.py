@@ -48,8 +48,8 @@ class BinarizedForceOptController:
         body_Fx, body_Fy, M = u[0], u[1], u[2]
 
         th = x[2]
-        world_Fx = body_Fx#body_Fx*cos(th) - body_Fy*sin(th)
-        world_Fy = body_Fy#body_Fx*sin(th) + body_Fy*cos(th)
+        world_Fx = body_Fx*cos(th) - body_Fy*sin(th)
+        world_Fy = body_Fx*sin(th) + body_Fy*cos(th)
         
         # Model equations
         xdot = vertcat(x[3],

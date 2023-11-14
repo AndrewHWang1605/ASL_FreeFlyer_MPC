@@ -22,7 +22,7 @@ mean = 0
 sd = 0.02
 observer = StateObserver(dynamics, mean, sd)
 
-freq = 5
+freq = 3
 
 #create a planar quadrotor controller
 # controller = ConstantController(observer)
