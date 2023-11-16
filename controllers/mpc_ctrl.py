@@ -37,7 +37,7 @@ class MPC_Controller:
 
     def get_input(self):
         if self.command_seq is not None:
-            return self.command_seq[0]
+            return self.command_seq
         return np.zeros((8))
     
     def cost_function(self, sequence, simulated):
@@ -98,24 +98,42 @@ class MPC_Controller:
             return optimal_cost, [sequence] + optimal_sequence
         else:
             return None
+
+        # if predicted_cost > curr_cost: # means we are not getting closer to the target with that specific command
+        #     # we need to make sure the returned sequence is like nothing and cost is infinity
+        #     sequence = None
+        # elif predicted_cost < optimal_cost:
+        #     optimal_cost = predicted_cost
+        #     self.total_sequences[DEPTH-depth] = sequence
+            
+        
+        # cost_state = self.state_cost(predicted_state) * DISCOUNT**(DEPTH-depth)
+        # total_cost = cost_state
+        # sequences = off_by_one(sequence)
+        
+        # if sequences is not None:
+        #     for i in range(8):
+        #         result = self.recursive_costs(sequences[i], ThrusterDyn(predicted_state), depth-1, cost_state)
+        #         print(result)
+        #         if result is not None:
+        #             total_cost += result[1]
+        #     return sequence, total_cost
+        # else:
+        #     return None
         
 
     def eval_input(self):
         # go thru the information and return the best thruster action to take. 
-            
+
         min_cost = float('inf')
         # we don't know what the cost is.
-        if self.prev_command is not None:
-            init_sample = off_by_one(self.prev_command)
-        else:
-            init_sample = np.zeros((NUM_SAMPLES, 8))
-            for i in range(NUM_SAMPLES):
-                number = random.randint(0,80)
-                init_sample[i] = sample_2binary(number)
-        
-        # We have a set of samples that we can find the best action resulting from it
-        for idx in range(len(init_sample)):
-            sample_result = self.recursive_costs(init_sample[idx], ThrusterDyn(self.observer.get_state()), 0, None)
+
+        number = random.randint(0,80)
+        init_sample = sample_2binary(number)
+        # by this step, we have a sample that we can find the best action resulting from it
+
+
+        sample_result = self.recursive_costs(init_sample, ThrusterDyn(self.observer.get_state()), 0, None)
         
         if sample_result is not None:
             sample_cost, sample_sequence = sample_result
@@ -124,10 +142,8 @@ class MPC_Controller:
                 self.command_seq = init_sample
 
         if self.command_seq is not None:
-            self.prev_command = self.command_seq[0]
-            print("made to command",self.command_seq[0])
-            return self.command_seq[0]
-        print("returning previous",self.prev_command)      
+            self.prev_command = self.command_seq
+            return self.command_seq
         return self.prev_command
     
     
@@ -140,7 +156,7 @@ def off_by_one(seq):
     '''
     if seq is None:
         return None
-    sequences = [seq]
+    sequences = []
     # change the first one and assign to first in sequence
     for i in range(len(seq)):
         seq_ = seq.copy()
