@@ -7,6 +7,7 @@ from dynamics import *
 from constant_control import ConstantController
 from LQR_pulse_control import LQRPulseController
 from Binarized_forceopt_control import BinarizedForceOptController
+from Binarized_continuousopt_control import BinaryContOptController
 # from trajectory import *
 from state_observer import *
 
@@ -24,14 +25,18 @@ observer = StateObserver(dynamics, mean, sd)
 
 freq = 3
 
-#create a planar quadrotor controller
+#define controller
 # controller = ConstantController(observer)
 # controller = LQRPulseController(observer, xf)
-controller = BinarizedForceOptController(observer, xf, freq)
+# controller = BinarizedForceOptController(observer, xf, 3)
+controller = BinaryContOptController(observer, xf, 3)
+
 
 # create a simulation environment
 # env = Environment(dynamics, controller, observer, xf, time=30, freq=10) # Lqr config
-env = Environment(dynamics, controller, observer, xf, time=20, freq=freq) # Mapped Continuous Force Opt config
+# env = Environment(dynamics, controller, observer, xf, time=30, freq=3) # Mapped Continuous Force Opt config
+env = Environment(dynamics, controller, observer, xf, time=30, freq=3) # Continuous Thruster Opt config
+
 
 env.reset()
 

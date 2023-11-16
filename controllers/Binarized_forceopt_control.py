@@ -221,10 +221,10 @@ class BinarizedForceOptController:
     def get_input(self):
         return self._u
 
-    def _transform_wrench(self, glob_vec, th):
-        c, s = np.cos(th), np.sin(th)
-        R = np.array([[c, -s], [s, c]])
-        return R.T @ glob_vec
+    # def _transform_wrench(self, glob_vec, th):
+    #     c, s = np.cos(th), np.sin(th)
+    #     R = np.array([[c, -s], [s, c]])
+    #     return R.T @ glob_vec
 
     def _map_to_thrusters(self, Fx, Fy, M):
         print(Fx, Fy, M)
