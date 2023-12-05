@@ -8,6 +8,7 @@ from constant_control import ConstantController
 from LQR_pulse_control import LQRPulseController
 from Binarized_forceopt_control import BinarizedForceOptController
 from Binarized_continuousopt_control import BinaryContOptController
+from mpc_ctrl import MPC_Controller
 # from trajectory import *
 from state_observer import *
 
@@ -20,7 +21,7 @@ dynamics = ThrusterDyn(x0)
 
 #create an observer based on the dynamics object with noise parameters
 mean = 0
-sd = 0.02
+sd = 0.1
 observer = StateObserver(dynamics, mean, sd)
 
 freq = 3
@@ -28,14 +29,15 @@ freq = 3
 #define controller
 # controller = ConstantController(observer)
 # controller = LQRPulseController(observer, xf)
+controller = MPC_Controller(observer, dynamics, xf)
 # controller = BinarizedForceOptController(observer, xf, 3)
-controller = BinaryContOptController(observer, xf, 3)
+# controller = BinaryContOptController(observer, xf, 3)
 
 
 # create a simulation environment
 # env = Environment(dynamics, controller, observer, xf, time=30, freq=10) # Lqr config
-# env = Environment(dynamics, controller, observer, xf, time=30, freq=3) # Mapped Continuous Force Opt config
-env = Environment(dynamics, controller, observer, xf, time=30, freq=3) # Continuous Thruster Opt config
+env = Environment(dynamics, controller, observer, xf, time=30, freq=3) # Mapped Continuous Force Opt config
+# env = Environment(dynamics, controller, observer, xf, time=30, freq=3) # Continuous Thruster Opt config
 
 
 env.reset()
