@@ -62,7 +62,7 @@ class BinarizedForceOptController:
         # k_t = 0
         k_th = 0.5
         k_pos = 40
-        k_input = 20
+        k_input = 60#20
         k_velo = 7
         # Stepwise Cost
         L =  k_th*(self.goal[2]-x[2])**2 + k_pos*(self.normsq(self.goal[0:2] - x[0:2])) + k_input*(self.normsq(u)) + k_velo*self.normsq(x[3:])

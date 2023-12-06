@@ -142,6 +142,8 @@ class Environment:
         Provide visualization of the environment
         """
         print("Total Input Effort:", np.sum(np.trapz(self.uHist, self.tHist)))
+        print("Total Input Effort:", np.sum(np.dot(self.uHist[:,:-1],np.diff(self.tHist).T)))
+        # print("Total Input Effort:", np.sum(np.dot(self.uHist, np.diff(self.tHist).T)))
         print("Final Tracking Error:", self.xHist[:,-1] - self.goal.T)
         try:
             poserr_ind = np.argwhere(np.linalg.norm(self.xHist[:2,:] - self.goal[:2], axis=0) > 0.05).squeeze()

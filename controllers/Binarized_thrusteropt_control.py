@@ -9,7 +9,7 @@ from casadi import *
 
 
 
-class BinaryContOptController:
+class BinarizedThrustOptController:
     def __init__(self, state_observer, goal, freq):
         self.observer = state_observer
         self.goal = DM(list(goal))
