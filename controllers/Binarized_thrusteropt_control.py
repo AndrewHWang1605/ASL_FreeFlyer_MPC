@@ -31,8 +31,10 @@ class BinarizedThrustOptController:
         # Bounds on x (x,y,th,xdot,ydot,thdot)
         self.lbx = [-4., -4., -np.pi, -0.5, -0.5, -0.5]
         self.ubx = [4., 4., np.pi, 0.5, 0.5, 0.5]
-        self.lbu = [0.] * 8 
-        self.ubu = [self.Fmax] * 8 
+        self.lbu = [-self.Fmax] * 4 
+        self.ubu = [self.Fmax] * 4 
+
+        self.last_input_seq = None
 
     def eval_input(self):
         x0 = list(self.observer.get_state())
@@ -41,7 +43,7 @@ class BinarizedThrustOptController:
 
         # Declare model variables
         x = MX.sym('x', 6) # x,y,th,xdot,ydot,thdot
-        u = MX.sym('u', 8) # body-frame Fx, Fy, M
+        u = MX.sym('u', 4) # body-frame Fx, Fy, M
         # T = MX.sym('T') # Time
         
         body_Fx, body_Fy, M = self._map_to_force(u)
@@ -72,7 +74,7 @@ class BinarizedThrustOptController:
             DT = T/N/M
             f = Function('f', [x, u], [xdot, L])    # Define function to take in current state/input and output xdot and cost
             X0 = MX.sym('X0', 6)                
-            U = MX.sym('U', 8)
+            U = MX.sym('U', 4)
             X = X0
             Q = 0
             for j in range(M):
@@ -86,7 +88,8 @@ class BinarizedThrustOptController:
             F = Function('F', [X0, U], [X, Q],['x0','p'],['xf','qf'])   # Take in initial state and current input and outputs final state and cost after one step (Runge-Kutta integrated)
 
         # Initial guess for u
-        u_start = [DM([0.,0.,0.,0.,0.,0.,0.,0.])] * N
+        # if self.last_input_seq =
+        u_start = [DM([0.,0.,0.,0.])] * N
 
         # Get a feasible trajectory as an initial guess
         xk = DM(x0)
@@ -120,7 +123,7 @@ class BinarizedThrustOptController:
         Xk = X0
         for k in range(N):
             # New NLP variable for the control
-            Uk = MX.sym('U_' + str(k), 8)
+            Uk = MX.sym('U_' + str(k), 4)
             w   += [Uk]
             lbw += self.lbu
             ubw += self.ubu
@@ -172,6 +175,8 @@ class BinarizedThrustOptController:
         # cont_thrust1 = self._map_to_thrusters(fx_opt[1], fy_opt[1], m_opt[1])
         # cont_thrust2 = self._map_to_thrusters(fx_opt[2], fy_opt[2], m_opt[2])
         self._u = cont_thrust > 0.5
+
+        # self.last_input_seq = get_next_warm_input(output)
         # self._u = cont_thrust 
         
         def plot_sol(x_opt, y_opt, th_opt, fx_opt, fy_opt, m_opt, T_opt):
@@ -233,9 +238,10 @@ class BinarizedThrustOptController:
 
     def _map_to_force(self, u):
         # Compute body-frame force from thrusters
-        Fx = -u[0] + u[1] - u[5] + u[4]
-        Fy = -u[2] + u[3] - u[7] + u[6]
-        M = -self.r * (u[1]+u[3]+u[5]+u[7]) + self.r * (u[0]+u[2]+u[4]+u[6])
+    
+        Fx = -u[0] + u[2] #-u[0] + u[1] - u[5] + u[4]
+        Fy = -u[1] + u[3]#-u[2] + u[3] - u[7] + u[6]
+        M = self.r * (u[0]+u[1]+u[2]+u[3])#-self.r * (u[1]+u[3]+u[5]+u[7]) + self.r * (u[0]+u[2]+u[4]+u[6])
         return Fx, Fy, M
 
     # def _map_to_thrusters(self, Fx, Fy, M):
@@ -278,15 +284,26 @@ class BinarizedThrustOptController:
 
     def unpack_wopt(self, w_opt):
         w_opt = w_opt.full().flatten()
-        x_opt = w_opt[0::14]
-        y_opt = w_opt[1::14]
-        th_opt = w_opt[2::14]
-        u0_opt = w_opt[6::14]
-        u1_opt = w_opt[7::14]
-        u2_opt = w_opt[8::14]
-        u3_opt = w_opt[9::14]
-        u4_opt = w_opt[10::14]
-        u5_opt = w_opt[11::14]
-        u6_opt = w_opt[12::14]
-        u7_opt = w_opt[13::14]
+        # x_opt = w_opt[0::14]
+        # y_opt = w_opt[1::14]
+        # th_opt = w_opt[2::14]
+        # u0_opt = w_opt[6::14]
+        # u1_opt = w_opt[7::14]
+        # u2_opt = w_opt[8::14]
+        # u3_opt = w_opt[9::14]
+        # u4_opt = w_opt[10::14]
+        # u5_opt = w_opt[11::14]
+        # u6_opt = w_opt[12::14]
+        # u7_opt = w_opt[13::14]
+        x_opt = w_opt[0::10]
+        y_opt = w_opt[1::10]
+        th_opt = w_opt[2::10]
+        u0_opt = np.multiply(w_opt[6::10] > 0, w_opt[6::10])
+        u1_opt = np.multiply(w_opt[6::10] < 0, -w_opt[6::10])
+        u2_opt = np.multiply(w_opt[7::10] > 0, w_opt[7::10])
+        u3_opt = np.multiply(w_opt[7::10] < 0, -w_opt[7::10])
+        u4_opt = np.multiply(w_opt[8::10] > 0, w_opt[8::10])
+        u5_opt = np.multiply(w_opt[8::10] < 0, -w_opt[8::10])
+        u6_opt = np.multiply(w_opt[9::10] > 0, w_opt[9::10])
+        u7_opt = np.multiply(w_opt[9::10] < 0, -w_opt[9::10])
         return u0_opt, u1_opt, u2_opt, u3_opt, u4_opt, u5_opt, u6_opt, u7_opt
