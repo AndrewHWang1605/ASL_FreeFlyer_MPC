@@ -88,8 +88,11 @@ class BinarizedThrustOptController:
             F = Function('F', [X0, U], [X, Q],['x0','p'],['xf','qf'])   # Take in initial state and current input and outputs final state and cost after one step (Runge-Kutta integrated)
 
         # Initial guess for u
-        # if self.last_input_seq =
-        u_start = [DM([0.,0.,0.,0.])] * N
+        if (self.last_input_seq == None):
+            u_start = [DM([0.,0.,0.,0.])] * N
+        else:
+            u_start = [DM(self.last_input_seq[i]) for i in range(1, len(self.last_input_seq))]
+            u_start.append(DM([0.,0.,0.,0.]))
 
         # Get a feasible trajectory as an initial guess
         xk = DM(x0)
@@ -176,7 +179,7 @@ class BinarizedThrustOptController:
         # cont_thrust2 = self._map_to_thrusters(fx_opt[2], fy_opt[2], m_opt[2])
         self._u = cont_thrust > 0.5
 
-        # self.last_input_seq = get_next_warm_input(output)
+        self.last_input_seq = self.get_next_warm_input(output)
         # self._u = cont_thrust 
         
         def plot_sol(x_opt, y_opt, th_opt, fx_opt, fy_opt, m_opt, T_opt):
@@ -307,3 +310,15 @@ class BinarizedThrustOptController:
         u6_opt = np.multiply(w_opt[9::10] > 0, w_opt[9::10])
         u7_opt = np.multiply(w_opt[9::10] < 0, -w_opt[9::10])
         return u0_opt, u1_opt, u2_opt, u3_opt, u4_opt, u5_opt, u6_opt, u7_opt
+
+    def get_next_warm_input(self, w_opt):
+        output = w_opt.full().flatten()
+        u0 = output[6::10]
+        u1 = output[7::10]
+        u2 = output[8::10]
+        u3 = output[9::10]
+
+        appended_input = []
+        for i in range(len(u0)):
+            appended_input.append([u0[i], u1[i], u2[i], u3[i]])
+        return appended_input
