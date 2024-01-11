@@ -1,12 +1,12 @@
 """
-Script to supply constant control signal (for debugging)
+Script with binarized thruster output w/optimization-based controller
 Andrew Wang (aw1605@stanford.edu)
-10/20/2023
+01/11/2024
 """
 
 import numpy as np 
 from casadi import *
-
+import matplotlib.pyplot as plt
 
 
 class BinarizedThrustOptController:
@@ -36,14 +36,20 @@ class BinarizedThrustOptController:
 
         self.last_input_seq = None
 
-    def eval_input(self):
-        x0 = list(self.observer.get_state())
+        ########## Initialize solver ##########
+        self.w0, self.cont_nlp_solver, self.lbw, self.ubw, self.lbg, self.ubg = self.init_solver()
+        print("Lower bound",self.lbw)
+        print(self.w0)
+        
+    def init_solver(self):
         T = 3
         N = int(T * self.freq)
+        print(list(self.observer.get_state()))
+        x0 = list(self.observer.get_state())
 
         # Declare model variables
         x = MX.sym('x', 6) # x,y,th,xdot,ydot,thdot
-        u = MX.sym('u', 4) # body-frame Fx, Fy, M
+        u = MX.sym('u', 4) # 4 trinary thrusters (-1, 0, 1)
         # T = MX.sym('T') # Time
         
         body_Fx, body_Fy, M = self._map_to_force(u)
@@ -66,7 +72,7 @@ class BinarizedThrustOptController:
         k_input = 3
         k_velo = 40
         # Stepwise Cost
-        L =  k_th*(self.goal[2]-x[2])**2 + k_pos*(self.normsq(self.goal[0:2] - x[0:2])) + k_input*(self.normsq(u)) + k_velo*self.normsq(x[3:])
+        L =  k_th*(self.goal[2]-x[2])**2 + k_pos*(self.normsq(self.goal[0:2] - x[0:2])) #+ k_input*(self.normsq(u)) + k_velo*self.normsq(x[3:])
 
         if True:
             # Fixed step Runge-Kutta 4 integrator
@@ -102,13 +108,13 @@ class BinarizedThrustOptController:
             xk = F(x0=xk, p=u_start[k])['xf']
             x_start += [xk]
 
+        print("Starting trajectory guess: ", x_start)
         # Start with an empty NLP
         w=[]
         w0 = []
         lbw = []
         ubw = []
         discrete = []
-        # discrete2 = []
         J = 0
         g=[]
         lbg = []
@@ -120,6 +126,7 @@ class BinarizedThrustOptController:
         lbw += x0
         ubw += x0
         w0 += [x_start[0]]
+
         # discrete += [False, False, False, False, False, False]
 
         # Formulate the NLP
@@ -146,12 +153,10 @@ class BinarizedThrustOptController:
             ubw += self.ubx
             w0  += [x_start[k+1]]
             # discrete += [False, False, False, False]
-
             # Add equality constraint
             g   += [Xk_end-Xk]
             lbg += [0, 0, 0, 0, 0, 0]
             ubg += [0, 0, 0, 0, 0, 0]
-
 
         # w   += [T]
         # lbw += [15]
@@ -170,62 +175,67 @@ class BinarizedThrustOptController:
         # nlp_solver = nlpsol('nlp_solver', 'bonmin', nlp_prob, {"discrete": discrete})
         # nlp_solver = nlpsol('nlp_solver', 'knitro', nlp_prob, {"discrete": discrete})
         cont_nlp_solver = nlpsol('nlp_solver', 'ipopt', nlp_prob); # Solve relaxed problem
-        sol = cont_nlp_solver(x0=vertcat(*w0), lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)
+        return w0, cont_nlp_solver, lbw, ubw, lbg, ubg
+    
+    def eval_input(self):
+        x0 = list(self.observer.get_state())
+
+        self.lbw[:len(x0)] = x0
+        self.ubw[:len(x0)] = x0
+        
+        sol = self.cont_nlp_solver(x0=vertcat(*self.w0), lbx=self.lbw, ubx=self.ubw, lbg=self.lbg, ubg=self.ubg)
         output = sol['x']
-        u0_opt, u1_opt, u2_opt, u3_opt, u4_opt, u5_opt, u6_opt, u7_opt = self.unpack_wopt(output)
+        u0_opt, u1_opt, u2_opt, u3_opt, u4_opt, u5_opt, u6_opt, u7_opt, x_opt, y_opt, th_opt = self.unpack_wopt(output)
         cont_thrust = np.array([u0_opt[0], u1_opt[0], u2_opt[0], u3_opt[0], u4_opt[0], u5_opt[0], u6_opt[0], u7_opt[0]]).reshape((8,1)) / self.Fmax
-        # cont_thrust0 = self._map_to_thrusters(fx_opt[0], fy_opt[0], m_opt[0])
-        # cont_thrust1 = self._map_to_thrusters(fx_opt[1], fy_opt[1], m_opt[1])
-        # cont_thrust2 = self._map_to_thrusters(fx_opt[2], fy_opt[2], m_opt[2])
         self._u = cont_thrust > 0.5
 
         self.last_input_seq = self.get_next_warm_input(output)
         # self._u = cont_thrust 
         
-        def plot_sol(x_opt, y_opt, th_opt, fx_opt, fy_opt, m_opt, T_opt):
-            tgrid = [T_opt/N*k for k in range(N+1)]
+        def plot_sol(x_opt, y_opt, th_opt):
+            # tgrid = [T_opt/N*k for k in range(N+1)]
             plt.figure(figsize=(10,8))
             plt.subplot(5,1,1)
             plt.plot(x_opt, y_opt,'*-')
 
             plt.subplot(5,1,2)
-            plt.plot(tgrid, x_opt, 'k-')
+            plt.plot(x_opt, 'k-')
             # plt.plot([0,T], [goal[0].__float__(),goal[0].__float__()], 'k--')
             # plt.plot(tgrid, y_opt, 'r-')
             # plt.plot([0,T], [goal[1].__float__(),goal[1].__float__()], 'r--')
             # plt.legend(['x','xgoal','y','ygoal'])
 
             plt.subplot(5,1,3)
-            plt.plot(tgrid, vertcat(DM.nan(1), fx_opt))
-            # plt.step(tgrid, vertcat(DM.nan(1), u0_opt), 'r-')
-            # plt.step(tgrid, vertcat(DM.nan(1), u1_opt), 'b-')
-            plt.ylabel("X thrusters")
-            plt.grid(True)
+            plt.plot(y_opt, 'k-')
+            # plt.plot(tgrid, vertcat(DM.nan(1), fx_opt))
+            # # plt.step(tgrid, vertcat(DM.nan(1), u0_opt), 'r-')
+            # # plt.step(tgrid, vertcat(DM.nan(1), u1_opt), 'b-')
+            # plt.ylabel("X thrusters")
+            # plt.grid(True)
 
-            plt.subplot(5,1,4)
-            plt.plot(tgrid, vertcat(DM.nan(1),fy_opt))
-            # plt.step(tgrid, vertcat(DM.nan(1), u2_opt), 'r-')
-            # plt.step(tgrid, vertcat(DM.nan(1), u3_opt), 'b-')
-            plt.xlabel('t')
-            plt.ylabel("Y thrusters")
+            # plt.subplot(5,1,4)
+            # plt.plot(tgrid, vertcat(DM.nan(1),fy_opt))
+            # # plt.step(tgrid, vertcat(DM.nan(1), u2_opt), 'r-')
+            # # plt.step(tgrid, vertcat(DM.nan(1), u3_opt), 'b-')
+            # plt.xlabel('t')
+            # plt.ylabel("Y thrusters")
 
-            plt.subplot(5,1,5)
-            plt.plot(tgrid, vertcat(DM.nan(1),m_opt))
-            # plt.step(tgrid, vertcat(DM.nan(1), u2_opt), 'r-')
-            # plt.step(tgrid, vertcat(DM.nan(1), u3_opt), 'b-')
-            plt.xlabel('t')
-            plt.ylabel("Moment")
-            plt.grid(True)
+            # plt.subplot(5,1,5)
+            # plt.plot(tgrid, vertcat(DM.nan(1),m_opt))
+            # # plt.step(tgrid, vertcat(DM.nan(1), u2_opt), 'r-')
+            # # plt.step(tgrid, vertcat(DM.nan(1), u3_opt), 'b-')
+            # plt.xlabel('t')
+            # plt.ylabel("Moment")
+            # plt.grid(True)
 
             # plt.suptitle(x_opt[:,0])
             plt.show()
 
-        # plot_sol(x_opt, y_opt, th_opt, fx_opt, fy_opt, m_opt, T_opt)
+        # plot_sol(x_opt, y_opt, th_opt)
         # sys.exit()
         return self._u
 
     
-
     def get_input(self):
         return self._u
 
@@ -287,20 +297,12 @@ class BinarizedThrustOptController:
 
     def unpack_wopt(self, w_opt):
         w_opt = w_opt.full().flatten()
-        # x_opt = w_opt[0::14]
-        # y_opt = w_opt[1::14]
-        # th_opt = w_opt[2::14]
-        # u0_opt = w_opt[6::14]
-        # u1_opt = w_opt[7::14]
-        # u2_opt = w_opt[8::14]
-        # u3_opt = w_opt[9::14]
-        # u4_opt = w_opt[10::14]
-        # u5_opt = w_opt[11::14]
-        # u6_opt = w_opt[12::14]
-        # u7_opt = w_opt[13::14]
         x_opt = w_opt[0::10]
         y_opt = w_opt[1::10]
         th_opt = w_opt[2::10]
+        xdot_opt = w_opt[3::10]
+        ydot_opt = w_opt[4::10]
+        thdot_opt = w_opt[5::10]
         u0_opt = np.multiply(w_opt[6::10] > 0, w_opt[6::10])
         u1_opt = np.multiply(w_opt[6::10] < 0, -w_opt[6::10])
         u2_opt = np.multiply(w_opt[7::10] > 0, w_opt[7::10])
@@ -309,7 +311,7 @@ class BinarizedThrustOptController:
         u5_opt = np.multiply(w_opt[8::10] < 0, -w_opt[8::10])
         u6_opt = np.multiply(w_opt[9::10] > 0, w_opt[9::10])
         u7_opt = np.multiply(w_opt[9::10] < 0, -w_opt[9::10])
-        return u0_opt, u1_opt, u2_opt, u3_opt, u4_opt, u5_opt, u6_opt, u7_opt
+        return u0_opt, u1_opt, u2_opt, u3_opt, u4_opt, u5_opt, u6_opt, u7_opt, x_opt, y_opt, th_opt, xdot_opt, ydot_opt, thdot_opt
 
     def get_next_warm_input(self, w_opt):
         output = w_opt.full().flatten()
