@@ -37,7 +37,7 @@ controller = BinarizedThrustOptController(observer, xf, 3)
 # create a simulation environment
 # env = Environment(dynamics, controller, observer, xf, time=30, freq=10) # Lqr config
 # env = Environment(dynamics, controller, observer, xf, time=30, freq=3) # Mapped Continuous Force Opt config
-env = Environment(dynamics, controller, observer, xf, time=30, freq=5) # Continuous Thruster Opt config
+env = Environment(dynamics, controller, observer, xf, time=30, freq=3) # Continuous Thruster Opt config
 # env = Environment(dynamics, controller, observer, xf, time=15, freq=freq) # Mixed-Int Thruster Opt config
 
 
