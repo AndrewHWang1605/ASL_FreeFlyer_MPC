@@ -70,31 +70,28 @@ class BinarizedThrustOptController:
         # Stepwise Cost
         L =  k_th*(self.goal[2]-x[2])**2 + k_pos*(self.normsq(self.goal[0:2] - x[0:2])) + k_input*(self.normsq(u)) + k_velo*self.normsq(x[3:])
 
-        if True:
-            # Fixed step Runge-Kutta 4 integrator
-            M = 4 # RK4 steps per interval
-            DT = T/N/M
-            f = Function('f', [x, u], [xdot, L])    # Define function to take in current state/input and output xdot and cost
-            X0 = MX.sym('X0', 6)                
-            U = MX.sym('U', 4)
-            X = X0
-            Q = 0
-            for j in range(M):
-                k1, k1_q = f(X, U)
-                k2, k2_q = f(X + DT/2 * k1, U)
-                k3, k3_q = f(X + DT/2 * k2, U)
-                k4, k4_q = f(X + DT * k3, U)
-                X=X+DT/6*(k1 +2*k2 +2*k3 +k4)
-                Q = Q + DT/6*(k1_q + 2*k2_q + 2*k3_q + k4_q)
-            # F = Function('F', [T, X0, U], [X, Q],['time', 'x0','p'],['xf','qf'])   # Take in initial state and current input and outputs final state and cost after one step (Runge-Kutta integrated)
-            F = Function('F', [X0, U], [X, Q],['x0','p'],['xf','qf'])   # Take in initial state and current input and outputs final state and cost after one step (Runge-Kutta integrated)
+        # Fixed step Runge-Kutta 4 integrator
+        M = 4 # RK4 steps per interval
+        DT = T/N/M
+        f = Function('f', [x, u], [xdot, L])    # Define function to take in current state/input and output xdot and cost
+        X0 = MX.sym('X0', 6)                
+        U = MX.sym('U', 4)
+        X = X0
+        Q = 0
+        for j in range(M):
+            k1, k1_q = f(X, U)
+            k2, k2_q = f(X + DT/2 * k1, U)
+            k3, k3_q = f(X + DT/2 * k2, U)
+            k4, k4_q = f(X + DT * k3, U)
+            X=X+DT/6*(k1 +2*k2 +2*k3 +k4)
+            Q = Q + DT/6*(k1_q + 2*k2_q + 2*k3_q + k4_q)
+        F = Function('F', [X0, U], [X, Q],['x0','p'],['xf','qf'])   # Take in initial state and current input and outputs final state and cost after one step (Runge-Kutta integrated)
 
         # Initial guess for u
         u_start = [DM([0.,0.,0.,0.])] * N
 
         # Get a feasible trajectory as an initial guess
         xk = DM(x0)
-        # T_start = DM(T0)
         x_start = [xk]
         for k in range(N):
             xk = F(x0=xk, p=u_start[k])['xf']
@@ -118,8 +115,6 @@ class BinarizedThrustOptController:
         ubw += x0
         w0 += [x_start[0]]
 
-        # discrete += [False, False, False, False, False, False]
-
         # Formulate the NLP
         Xk = X0
         for k in range(N):
@@ -129,10 +124,8 @@ class BinarizedThrustOptController:
             lbw += self.lbu
             ubw += self.ubu
             w0  += [u_start[k]]
-            # discrete += [True, True, True]
 
             # Integrate till the end of the interval
-            # Fk = F(time=T, x0=Xk, p=Uk)
             Fk = F(x0=Xk, p=Uk)
             Xk_end = Fk['xf']
             J=J+Fk['qf']
@@ -143,18 +136,11 @@ class BinarizedThrustOptController:
             lbw += self.lbx
             ubw += self.ubx
             w0  += [x_start[k+1]]
-            # discrete += [False, False, False, False]
             # Add equality constraint
             g   += [Xk_end-Xk]
             lbg += [0, 0, 0, 0, 0, 0]
             ubg += [0, 0, 0, 0, 0, 0]
 
-        # w   += [T]
-        # lbw += [15]
-        # ubw += [15]
-        # w0  += [T0]
-        # # discrete += [False]
-        # J = J + k_t*T
         J = J + 10*k_pos*(self.normsq(Xk_end[0:2]-self.goal[0:2])) + 10*k_th*(self.normsq(self.goal[2]-Xk_end[2])) + 10*k_velo*self.normsq(Xk_end[3:])
 
         # Concatenate decision variables and constraint terms
@@ -245,41 +231,9 @@ class BinarizedThrustOptController:
         # Compute body-frame force from thrusters
     
         Fx = -u[0] + u[2] #-u[0] + u[1] - u[5] + u[4]
-        Fy = -u[1] + u[3]#-u[2] + u[3] - u[7] + u[6]
-        M = self.r * (u[0]+u[1]+u[2]+u[3])#-self.r * (u[1]+u[3]+u[5]+u[7]) + self.r * (u[0]+u[2]+u[4]+u[6])
+        Fy = -u[1] + u[3] #-u[2] + u[3] - u[7] + u[6]
+        M = self.r * (u[0]+u[1]+u[2]+u[3]) #-self.r * (u[1]+u[3]+u[5]+u[7]) + self.r * (u[0]+u[2]+u[4]+u[6])
         return Fx, Fy, M
-
-    # def _map_to_thrusters(self, Fx, Fy, M):
-    #     # print(Fx, Fy, M)
-    #     cmd = np.zeros(8)
-    #     # u_Fx = np.clip(Fx / 2, -self.Fmax, self.Fmax)
-    #     # u_Fy = np.clip(Fy / 2, -self.Fmax, self.Fmax)
-    #     u_Fx = Fx / 2
-    #     u_Fy = Fy / 2
-    #     if u_Fx > 0:
-    #         cmd[1] = u_Fx
-    #         cmd[4] = u_Fx
-    #     else:
-    #         cmd[0] = -u_Fx
-    #         cmd[5] = -u_Fx
-    #     if u_Fy > 0:
-    #         cmd[3] = u_Fy
-    #         cmd[6] = u_Fy
-    #     else:
-    #         cmd[7] = -u_Fy
-    #         cmd[2] = -u_Fy
-
-    #     u_M = M / 4 / self.r
-    #     # u_M = np.clip(M / 4 / self.r, -self.Fmax, self.Fmax)
-    #     if u_M > 0:
-    #         cmd[[0, 2, 4, 6]] += u_M
-    #     else:
-    #         cmd[[1, 3, 5, 7]] += -u_M
-    #     maxInput = np.max(np.abs(cmd))
-    #     cmd = cmd / maxInput #* self.Fmax
-    #     output = cmd.reshape((8,1))
-    #     # output = np.clip(cmd, -self.Fmax, self.Fmax).reshape((8,1)) / self.Fmax
-    #     return output
 
     def normsq(self, x):
         sum = 0
@@ -303,19 +257,7 @@ class BinarizedThrustOptController:
         u5_opt = np.multiply(w_opt[8::10] < 0, -w_opt[8::10])
         u6_opt = np.multiply(w_opt[9::10] > 0, w_opt[9::10])
         u7_opt = np.multiply(w_opt[9::10] < 0, -w_opt[9::10])
-        return u0_opt, u1_opt, u2_opt, u3_opt, u4_opt, u5_opt, u6_opt, u7_opt#, x_opt, y_opt, th_opt, xdot_opt, ydot_opt, thdot_opt
-
-    # def get_next_warm_input(self, w_opt):
-    #     output = w_opt.full().flatten()
-    #     u0 = output[6::10]
-    #     u1 = output[7::10]
-    #     u2 = output[8::10]
-    #     u3 = output[9::10]
-
-    #     appended_input = []
-    #     for i in range(len(u0)):
-    #         appended_input.append([u0[i], u1[i], u2[i], u3[i]])
-    #     return appended_input
+        return u0_opt, u1_opt, u2_opt, u3_opt, u4_opt, u5_opt, u6_opt, u7_opt #, x_opt, y_opt, th_opt, xdot_opt, ydot_opt, thdot_opt
 
     def get_next_warm_start(self, w_opt):
         output = w_opt.full().flatten()
