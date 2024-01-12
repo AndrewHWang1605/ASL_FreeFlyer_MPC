@@ -27,8 +27,7 @@ class BinarizedThrustOptController:
         self.m = 16
         self.Ixx = 0.18
         self.Fmax = 0.2
-        # Initialize constraints
-        # Bounds on x (x,y,th,xdot,ydot,thdot)
+        # Initialize constraints on x (x,y,th,xdot,ydot,thdot)
         self.lbx = [-4., -4., -np.pi, -0.5, -0.5, -0.5]
         self.ubx = [4., 4., np.pi, 0.5, 0.5, 0.5]
         self.lbu = [-self.Fmax] * 4 
@@ -91,11 +90,7 @@ class BinarizedThrustOptController:
             F = Function('F', [X0, U], [X, Q],['x0','p'],['xf','qf'])   # Take in initial state and current input and outputs final state and cost after one step (Runge-Kutta integrated)
 
         # Initial guess for u
-        if (self.last_input_seq == None):
-            u_start = [DM([0.,0.,0.,0.])] * N
-        else:
-            u_start = [DM(self.last_input_seq[i]) for i in range(1, len(self.last_input_seq))]
-            u_start.append(DM([0.,0.,0.,0.]))
+        u_start = [DM([0.,0.,0.,0.])] * N
 
         # Get a feasible trajectory as an initial guess
         xk = DM(x0)
@@ -178,6 +173,7 @@ class BinarizedThrustOptController:
 
         self.lbw[:len(x0)] = x0
         self.ubw[:len(x0)] = x0
+        self.w0[0] = x0
         
         sol = self.cont_nlp_solver(x0=vertcat(*self.w0), lbx=self.lbw, ubx=self.ubw, lbg=self.lbg, ubg=self.ubg)
         output = sol['x']
@@ -185,11 +181,8 @@ class BinarizedThrustOptController:
         cont_thrust = np.array([u0_opt[0], u1_opt[0], u2_opt[0], u3_opt[0], u4_opt[0], u5_opt[0], u6_opt[0], u7_opt[0]]).reshape((8,1)) / self.Fmax
         self._u = cont_thrust > 0.5
 
-        # Warm Start
+        # Warm Start next run
         self.w0 = self.get_next_warm_start(output)
-
-        # self.last_input_seq = self.get_next_warm_input(output)
-        # self._u = cont_thrust 
         
         def plot_sol(x_opt, y_opt, th_opt):
             # tgrid = [T_opt/N*k for k in range(N+1)]
@@ -326,19 +319,8 @@ class BinarizedThrustOptController:
 
     def get_next_warm_start(self, w_opt):
         output = w_opt.full().flatten()
-        # x_opt = w_opt[0::10]
-        # y_opt = w_opt[1::10]
-        # th_opt = w_opt[2::10]
-        # xdot_opt = w_opt[3::10]
-        # ydot_opt = w_opt[4::10]
-        # thdot_opt = w_opt[5::10]
         x = [output[i:6+i] for i in range(w_opt.size()[0]//10+1)]
         u = [output[6+i:10+i] for i in range(w_opt.size()[0]//10)]
-        # u0 = output[6::10]
-        # u1 = output[7::10]
-        # u2 = output[8::10]
-        # u3 = output[9::10]
-        # print()
 
         w0 = [DM(x[1])]
         for i in range(len(u)-1):
@@ -348,8 +330,3 @@ class BinarizedThrustOptController:
         w0 += [DM(x[-1])]
 
         return w0
-
-    #     appended_input = []
-    #     for i in range(len(u0)):
-    #         appended_input.append([u0[i], u1[i], u2[i], u3[i]])
-    #     return appended_input
