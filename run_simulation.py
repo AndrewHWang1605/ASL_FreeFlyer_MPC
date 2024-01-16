@@ -7,7 +7,7 @@ from dynamics import *
 from constant_control import ConstantController
 from LQR_pulse_control import LQRPulseController
 from Binarized_forceopt_control import BinarizedForceOptController
-from Binarized_thrusteropt_control import BinarizedThrustOptController
+from Binarized_thrusteropt_control_clean import BinarizedThrustOptController
 from MixedInt_thrusteropt_control import MixedIntThrusterOptController
 # from trajectory import *
 from state_observer import *
