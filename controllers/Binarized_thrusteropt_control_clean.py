@@ -36,12 +36,12 @@ class BinarizedThrustOptController:
         ubu = [self.Fmax] * 4 
 
         N = int(T * self.freq)
-        print(list(self.observer.get_state()))
         x0 = list(self.observer.get_state())
 
         # Declare model variables
         x = MX.sym('x', 6) # x,y,th,xdot,ydot,thdot
         u = MX.sym('u', 4) # 4 trinary thrusters (-1, 0, 1)
+        goal = MX.sym('goal', 6)
         
         body_Fx, body_Fy, M = self._map_to_force(u)
 
@@ -57,29 +57,30 @@ class BinarizedThrustOptController:
                        world_Fy / m,
                        M / Ixx)
 
+
         k_th = 1
         k_pos = 2.5
         k_input = 3
         k_velo = 40
         # Stepwise Cost
-        L =  k_th*(self.goal[2]-x[2])**2 + k_pos*(self.normsq(self.goal[0:2] - x[0:2])) + k_input*(self.normsq(u)) + k_velo*self.normsq(x[3:])
+        L =  k_th*(goal[2]-x[2])**2 + k_pos*(self.normsq(goal[0:2] - x[0:2])) + k_input*(self.normsq(u)) + k_velo*self.normsq(x[3:])
 
         # Fixed step Runge-Kutta 4 integrator
         M = 4 # RK4 steps per interval
         DT = T/N/M
-        f = Function('f', [x, u], [xdot, L])    # Define function to take in current state/input and output xdot and cost
+        f = Function('f', [x, u, goal], [xdot, L])    # Define function to take in current state/input and output xdot and cost
         X0 = MX.sym('X0', 6)                
         U = MX.sym('U', 4)
         X = X0
         Q = 0
         for j in range(M):
-            k1, k1_q = f(X, U)
-            k2, k2_q = f(X + DT/2 * k1, U)
-            k3, k3_q = f(X + DT/2 * k2, U)
-            k4, k4_q = f(X + DT * k3, U)
+            k1, k1_q = f(X, U, goal)
+            k2, k2_q = f(X + DT/2 * k1, U, goal)
+            k3, k3_q = f(X + DT/2 * k2, U, goal)
+            k4, k4_q = f(X + DT * k3, U, goal)
             X=X+DT/6*(k1 +2*k2 +2*k3 +k4)
             Q = Q + DT/6*(k1_q + 2*k2_q + 2*k3_q + k4_q)
-        F = Function('F', [X0, U], [X, Q],['x0','p'],['xf','qf'])   # Take in initial state and current input and outputs final state and cost after one step (Runge-Kutta integrated)
+        F = Function('F', [X0, U, goal], [X, Q],['x0','p','param_goal'],['xf','qf'])   # Take in initial state and current input and outputs final state and cost after one step (Runge-Kutta integrated)
 
         # Initial guess for u
         u_start = [DM([0.,0.,0.,0.])] * N
@@ -120,7 +121,7 @@ class BinarizedThrustOptController:
             w0  += [u_start[k]]
 
             # Integrate till the end of the interval
-            Fk = F(x0=Xk, p=Uk)
+            Fk = F(x0=Xk, p=Uk, param_goal=goal)
             Xk_end = Fk['xf']
             J=J+Fk['qf']
 
@@ -135,14 +136,15 @@ class BinarizedThrustOptController:
             lbg += [0, 0, 0, 0, 0, 0]
             ubg += [0, 0, 0, 0, 0, 0]
 
-        J = J + 10*k_pos*(self.normsq(Xk_end[0:2]-self.goal[0:2])) + 10*k_th*(self.normsq(self.goal[2]-Xk_end[2])) + 10*k_velo*self.normsq(Xk_end[3:])
+        J = J + 10*k_pos*(self.normsq(Xk_end[0:2]-goal[0:2])) + 10*k_th*(self.normsq(goal[2]-Xk_end[2])) + 10*k_velo*self.normsq(Xk_end[3:])
 
+        print(J)
         # Concatenate decision variables and constraint terms
         w = vertcat(*w)
         g = vertcat(*g)
 
         # Create an NLP solver
-        nlp_prob = {'f': J, 'x': w, 'g': g}
+        nlp_prob = {'f': J, 'p':goal, 'x': w, 'g': g}
         cont_nlp_solver = nlpsol('nlp_solver', 'ipopt', nlp_prob); # Solve relaxed problem
         return w0, cont_nlp_solver, lbw, ubw, lbg, ubg
     
@@ -153,8 +155,9 @@ class BinarizedThrustOptController:
         self.ubw[:len(x0)] = x0
         self.w0[0] = x0
         
-        sol = self.cont_nlp_solver(x0=vertcat(*self.w0), lbx=self.lbw, ubx=self.ubw, lbg=self.lbg, ubg=self.ubg)
+        sol = self.cont_nlp_solver(x0=vertcat(*self.w0), p=self.goal, lbx=self.lbw, ubx=self.ubw, lbg=self.lbg, ubg=self.ubg)
         output = sol['x']
+        print(output)
         u0_opt, u1_opt, u2_opt, u3_opt, u4_opt, u5_opt, u6_opt, u7_opt = self.unpack_wopt(output)
         cont_thrust = np.array([u0_opt[0], u1_opt[0], u2_opt[0], u3_opt[0], u4_opt[0], u5_opt[0], u6_opt[0], u7_opt[0]]).reshape((8,1)) / self.Fmax
         self._u = cont_thrust > 0.5
